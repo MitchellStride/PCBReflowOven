@@ -5,9 +5,9 @@ int thermoCS  = 10; //SS
 int thermoDO  = 12; //MISO
 int thermoCLK = 13; //SCLK
 
-int relay     = 7;
-int startstop = 8;
-int mode      = 9;
+int mode      = 0;
+int startstop = 1;
+int relay     = 2;
 
 int Est_Time = 121;
 
