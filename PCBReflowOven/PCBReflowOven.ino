@@ -23,8 +23,9 @@ int displayed_Profile = 0;
 String ProfileNames[3] = {
   "Pb Solder       ", "RoHS            ", "Profile 3       "
   };
+  //profile format: temp1, temp2, time1, temp 3, temp 4, time2
 int Profile[3][6] = {
-  {75,140,45,125,205,20},
+  {75,140,45,130,210,100},
   {75,140,45,125,205,20},
   {75,140,45,125,205,20},
   };
@@ -39,12 +40,11 @@ volatile long   count    = 0;
 volatile float  temp    = 0;
 
 void setup() {  
-  Serial.begin(9600); 
   lcd.begin(16, 2);
   lcd.print("PCB Reflow Oven");
   lcd.setCursor(0,1);
   lcd.print("  Stride Tech  ");
-  delay(1000);
+  delay(2000);
   
   lcd.clear();
   lcd.print("Select Profile:");
@@ -59,32 +59,75 @@ void setup() {
   digitalWrite(startstop, HIGH);
 
   pinMode(mode, INPUT);
-  digitalWrite(mode,HIGH);
-
-  //16b Timer1 - CTC Mode w/ 1 Hz
-  TCCR1A = 0;                           
-  TCCR1B = _BV(WGM12) | _BV(CS10) | _BV(CS12);   
-  OCR1A = 3902;                                
-  TIMSK1 = _BV(OCIE1A); 
+  digitalWrite(mode,HIGH); 
+  
 }
 
 
-SIGNAL(TIMER1_COMPA_vect) { 
-  float new_temp;
-  float prev_temp = temp;
+void loop(){
+    // Start/Stop the Profile 
+  if(digitalRead(startstop) == LOW && !pressed_StartorStop){
+    pressed_StartorStop = 1;
+    
+    if(toaster_running == 1){
+      toaster_running = 0;
+      reflow_State = 0;
+      digitalWrite(relay, LOW);
+     }
+    else{
+      toaster_running = 1; 
+      reflow_State = 1;
+      //16b Timer1 - CTC Mode w/ 1 Hz
+        TCCR1A = 0;                           
+        TCCR1B = _BV(WGM12) | _BV(CS10) | _BV(CS12);   
+        OCR1A = 3902;                                
+        TIMSK1 = _BV(OCIE1A);
+      } 
+    }
 
+  
+  if(digitalRead(startstop) == HIGH)
+    pressed_StartorStop = 0;
+
+  //Cycles Profile Menu
+  if(digitalRead(mode) == LOW && !pressed_Mode){
+    pressed_Mode = 1;
+    if(displayed_Profile < 2)
+      displayed_Profile++;
+    else
+      displayed_Profile = 0;
+
+    lcd.clear();
+    lcd.print("Select Profile:");
+    lcd.setCursor(0,1);
+    lcd.print("   ");
+    lcd.print(ProfileNames[displayed_Profile]);
+     }  
+  
+  if(digitalRead(mode) == HIGH)
+    pressed_Mode = 0;
+}
+
+ 
+SIGNAL(TIMER1_COMPA_vect) { 
+  float previous_temp = temp;
+  float tempRead;
   count ++;
   seconds = (float) count / 4;
 
-  new_temp = thermocouple.readCelsius();
-  if(isnan(new_temp)){
-    temp = prev_temp; 
-    }
+  tempRead = thermocouple.readCelsius();
+  if (isnan(tempRead)){
+    temp = previous_temp; 
+  }
   else{
-    temp = new_temp;
-    } 
+    temp = tempRead; 
+  }
+
+
+
 
   //line 1
+  lcd.clear();
   lcd.setCursor(0,0);
   lcd.print("Temp:");  
   lcd.setCursor(5,0);
@@ -100,16 +143,16 @@ SIGNAL(TIMER1_COMPA_vect) {
   //line 2
   lcd.setCursor(0,1);
   lcd.print("Targ:");  
-  lcd.setCursor(5,0);
+  lcd.setCursor(5,1);
   lcd.print(Profile[displayed_Profile][reflow_State]);
     if(Profile[displayed_Profile][reflow_State] < 99)
-      lcd.setCursor(7,0);
+      lcd.setCursor(7,1);
     else
-      lcd.setCursor(8,0);
+      lcd.setCursor(8,1);
   lcd.print((char)223);
   lcd.print("C  "); 
   Est_Time--;
-  lcd.print(Est_Time); 
+  //lcd.print(Est_Time); 
 
 
     
@@ -119,7 +162,7 @@ SIGNAL(TIMER1_COMPA_vect) {
      break;  
 
     case 1:
-      analogWrite(relay, Profile[displayed_Profile][0]);
+      digitalWrite(relay, HIGH);
         if(temp >= Profile[displayed_Profile][1]){
          reflow_State = 2;
           count = 0;  
@@ -137,7 +180,7 @@ SIGNAL(TIMER1_COMPA_vect) {
       break;  
 
     case 3:
-      analogWrite(relay,Profile[displayed_Profile][3]);
+      digitalWrite(relay, HIGH);
          if(temp >= Profile[displayed_Profile][4]){
            reflow_State = 4;
            count = 0;  
@@ -162,40 +205,5 @@ SIGNAL(TIMER1_COMPA_vect) {
          break;  
      }   
 
-  // Start/Stop the Profile 
-  if(digitalRead(startstop) == LOW && !pressed_StartorStop){
-    pressed_StartorStop = 1;
-    
-    if(toaster_running == 1){
-      toaster_running = 0;
-      reflow_State = 0;
-      digitalWrite(relay, LOW);
-     }
-    else{
-      toaster_running = 1; 
-      reflow_State = 1;
-      } 
-    }
 
-  
-  if(digitalRead(startstop) == HIGH)
-    pressed_StartorStop = 0;
-
-  //Cycles Profile Menu
-  if(digitalRead(mode) == LOW && !pressed_Mode){
-    pressed_Mode = 1;
-    if(displayed_Profile < 2)
-      displayed_Profile++;
-    else
-      displayed_Profile = 0;
-
-     lcd.setCursor(0,1);
-     lcd.print("   ");
-     lcd.print(ProfileNames[displayed_Profile]);
-     }  
-  
-  if(digitalRead(mode) == HIGH)
-    pressed_Mode = 0;
-    }
-
-void loop(){}
+}
